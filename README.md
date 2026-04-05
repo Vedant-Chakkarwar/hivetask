@@ -87,7 +87,11 @@ npm run db:seed
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The seed creates demo users you can log in with immediately.
+Open [http://localhost:3000](http://localhost:3000). The seed creates demo users — use the credentials below to log in immediately.
+
+> **Demo Login**
+> - **Username:** `Vedant`
+> - **Password:** `Vedant@31`
 
 ---
 
