@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum Status {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum NotificationType {
+  ASSIGNED
+  COMMENTED
+  DUE_SOON
+  MENTIONED
+}
+
+model User {
+  id                  String    @id @default(uuid())
+  email               String    @unique
+  name                String
+  password            String
+  avatarUrl           String?
+  color               String
+  publicKey           String?
+  encryptedPrivateKey String?
+  keySalt             String?
+  keyIv               String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  createdLists       TaskList[]     @relation("ListCreator")
+  memberOfLists      TaskList[]     @relation("ListMembers")
+  taskAssignments    TaskAssignee[] @relation("TaskAssignees")
+  createdTasks       Task[]         @relation("TaskCreator")
+  comments           Comment[]
+  notifications      Notification[] @relation("NotificationRecipient")
+  actedNotifications Notification[] @relation("NotificationActor")
+  attachments        Attachment[]
+  listKeyShares      ListKeyShare[] @relation("KeyRecipient")
+  sentKeyShares      ListKeyShare[] @relation("KeySender")
+}
+
+model TaskList {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  color       String   @default("#F59E0B")
+  icon        String?
+  createdById String
+  createdBy   User     @relation("ListCreator", fields: [createdById], references: [id])
+  members     User[]   @relation("ListMembers")
+  columns     Column[]
+  tasks       Task[]
+  labels      Label[]
+  keyShares   ListKeyShare[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Column {
+  id       String   @id @default(uuid())
+  name     String
+  position Int
+  color    String?
+  listId   String
+  list     TaskList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  tasks    Task[]
+}
+
+model Task {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  priority    Priority  @default(MEDIUM)
+  status      Status    @default(TODO)
+  dueDate     DateTime?
+  position    Int       @default(0)
+  listId      String
+  list        TaskList  @relation(fields: [listId], references: [id], onDelete: Cascade)
+  columnId    String?
+  column      Column?   @relation(fields: [columnId], references: [id], onDelete: SetNull)
+  assignees   TaskAssignee[]
+  createdById String
+  createdBy   User      @relation("TaskCreator", fields: [createdById], references: [id])
+  labels      Label[]   @relation("TaskLabels")
+  subtasks    Subtask[]
+  comments    Comment[]
+  attachments Attachment[]
+  notifications Notification[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Subtask {
+  id        String  @id @default(uuid())
+  title     String
+  completed Boolean @default(false)
+  position  Int     @default(0)
+  taskId    String
+  task      Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model Label {
+  id     String   @id @default(uuid())
+  name   String
+  color  String
+  listId String
+  list   TaskList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  tasks  Task[]   @relation("TaskLabels")
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Attachment {
+  id           String   @id @default(uuid())
+  fileName     String
+  fileUrl      String
+  fileSize     Int
+  mimeType     String
+  taskId       String
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  type      NotificationType
+  message   String
+  read      Boolean          @default(false)
+  userId    String
+  user      User             @relation("NotificationRecipient", fields: [userId], references: [id])
+  taskId    String?
+  task      Task?            @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  actorId   String?
+  actor     User?            @relation("NotificationActor", fields: [actorId], references: [id])
+  createdAt DateTime         @default(now())
+}
+
+model TaskAssignee {
+  id         String   @id @default(uuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation("TaskAssignees", fields: [userId], references: [id])
+  completed  Boolean  @default(false)
+  assignedAt DateTime @default(now())
+
+  @@unique([taskId, userId])
+  @@index([userId])
+  @@index([taskId])
+}
+
+model ListKeyShare {
+  id           String   @id @default(uuid())
+  listId       String
+  list         TaskList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation("KeyRecipient", fields: [userId], references: [id])
+  encryptedLEK String
+  iv           String
+  senderUserId String
+  sender       User     @relation("KeySender", fields: [senderUserId], references: [id])
+
+  @@unique([listId, userId])
+}

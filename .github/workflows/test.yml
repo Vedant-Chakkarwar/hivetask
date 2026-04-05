@@ -1,0 +1,41 @@
+name: Regression Tests
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: hivetask_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: 'postgresql://test:test@localhost:5432/hivetask_test'
+      - run: npx prisma db seed
+        env:
+          DATABASE_URL: 'postgresql://test:test@localhost:5432/hivetask_test'
+      - run: npm run test:coverage
+      - run: npx playwright install --with-deps
+      - run: npm run test:e2e
+        env:
+          DATABASE_URL: 'postgresql://test:test@localhost:5432/hivetask_test'
+      - run: node scripts/merge-reports.js
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports
+          path: test-reports/
